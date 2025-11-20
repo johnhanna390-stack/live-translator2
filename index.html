@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Live Speech → Text + Translation (FREE)</title>
+  <title>Live Speech → Text + Translation (MyMemory)</title>
   <style>
     body { font-family: Arial, sans-serif; padding: 18px; background: #f4f4f4; }
     .controls { display:flex; gap:10px; align-items:center; margin-bottom:12px; }
@@ -19,28 +19,16 @@
 </head>
 <body>
 
-<h1>Live Speech → Text + Translation (FREE)</h1>
+<h1>Live Speech → Text + Translation (MyMemory)</h1>
 
 <div class="controls">
   <label for="langSelect">Input language:</label>
   <select id="langSelect" aria-label="Select input language">
-    <option value="en-US">English (default)</option>
-
-    <!-- Arabic options -->
-    <option value="ar-SA">Arabic (Modern Standard)</option>
-    <option value="ar-EG">Arabic (Egyptian dialect)</option>
-
-    <!-- NEW: Spanish -->
-    <option value="es-ES">Spanish (Spain)</option>
-    <option value="es-MX">Spanish (Mexico)</option>
-
-    <!-- NEW: French -->
-    <option value="fr-FR">French (France)</option>
-
-    <!-- NEW: Italian -->
+    <option value="en-US">English</option>
+    <option value="es-ES">Spanish</option>
+    <option value="fr-FR">French</option>
     <option value="it-IT">Italian</option>
-
-    <option value="auto">Auto (English recognizer)</option>
+    <option value="ar-SA">Arabic (Modern Standard)</option>
   </select>
 
   <button id="startBtn">Start</button>
@@ -49,147 +37,115 @@
 </div>
 
 <h2>Detected Speech</h2>
-<div id="transcript">...</div>
+<div id="transcript">Press Start and speak.</div>
 
 <h2>English Translation</h2>
-<div id="translation">...</div>
+<div id="translation">Translations appear here.</div>
 
-<footer>Works best in Chrome/Chromium. Translation uses a free public API (MyMemory) — accuracy is generally good for Spanish/French/Italian and varies for other languages.</footer>
+<footer>Works best in Chrome. Translation uses MyMemory (free, no key, reliable for short phrases). Arabic translation may be less accurate.</footer>
 
 <script>
-  const startBtn = document.getElementById('startBtn');
-  const stopBtn = document.getElementById('stopBtn');
-  const saveBtn = document.getElementById('saveBtn');
-  const langSelect = document.getElementById('langSelect');
-  const transcriptDiv = document.getElementById('transcript');
-  const translationDiv = document.getElementById('translation');
+const startBtn = document.getElementById('startBtn');
+const stopBtn = document.getElementById('stopBtn');
+const saveBtn = document.getElementById('saveBtn');
+const langSelect = document.getElementById('langSelect');
+const transcriptDiv = document.getElementById('transcript');
+const translationDiv = document.getElementById('translation');
 
-  let recognition = null;
-  let running = false;
-  let fullText = '';
-  let fullTranslation = '';
+let recognition = null;
+let fullText = '';
+let fullTranslation = '';
 
-  function createRecognition(lang) {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert('SpeechRecognition not supported in this browser. Use Chrome/Edge (Chromium).');
-      return null;
-    }
-    const r = new SpeechRecognition();
-    r.continuous = true;
-    r.interimResults = true;
-    r.maxAlternatives = 1;
-    if (lang && lang !== 'auto') r.lang = lang;
-    else r.lang = 'en-US';
+// MyMemory translation function
+async function translateMyMemory(text, lang) {
+  if (!text) return '';
+  // Skip translation if English
+  if (lang.startsWith('en')) return text;
+  try {
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${lang.split('-')[0]}|en`;
+    const res = await fetch(url);
+    if (!res.ok) return '(translation error)';
+    const data = await res.json();
+    return data.responseData?.translatedText || '(no translation)';
+  } catch (err) {
+    console.error('Translation error', err);
+    return '(translation error)';
+  }
+}
 
-    r.onresult = async (event) => {
-      let interim = '';
-      let final = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const part = event.results[i][0].transcript;
-        if (event.results[i].isFinal) final += part + ' ';
-        else interim += part;
-      }
-
-      const visible = ((fullText ? fullText + ' ' : '') + final + ' ' + interim).trim();
-      transcriptDiv.textContent = visible;
-
-      if (final.trim()) {
-        const finalized = final.trim();
-        fullText = (fullText ? fullText + ' ' : '') + finalized;
-
-        // Translate finalized text to English if it doesn't look like plain ASCII English
-        const translated = await translateToEnglish(finalized);
-        fullTranslation = (fullTranslation ? fullTranslation + ' ' : '') + translated;
-        translationDiv.textContent = fullTranslation;
-      }
-    };
-
-    r.onerror = (ev) => {
-      console.warn('Speech error', ev);
-    };
-
-    r.onend = () => {
-      running = false;
-      startBtn.disabled = false;
-      stopBtn.disabled = true;
-    };
-
-    return r;
+// Setup SpeechRecognition
+function createRecognition(lang) {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    alert('SpeechRecognition not supported in this browser. Use Chrome/Edge.');
+    return null;
   }
 
-  // Heuristic: if text looks like plain ASCII English, skip translation.
-  function looksLikeEnglish(text) {
-    // allow common punctuation; if any accented or non-ascii letters present, treat as non-English
-    return /^[\x00-\x7F]*$/.test(text) && /[A-Za-z]/.test(text);
-  }
+  const r = new SpeechRecognition();
+  r.continuous = true;
+  r.interimResults = true;
+  r.lang = lang;
 
-  // Use MyMemory free translator for non-English text (auto -> English)
-  async function translateToEnglish(text) {
-    if (!text || !text.trim()) return '';
-    if (looksLikeEnglish(text)) {
-      return text; // likely English already
+  r.onresult = async (event) => {
+    let interim = '';
+    let final = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const part = event.results[i][0].transcript;
+      if (event.results[i].isFinal) final += part + ' ';
+      else interim += part;
     }
-    try {
-      // Use langpair=auto|en — MyMemory usually accepts this
-      const url = 'https://api.mymemory.translated.net/get?q=' + encodeURIComponent(text) + '&langpair=auto|en';
-      const res = await fetch(url);
-      if (!res.ok) return '(translation error)';
-      const data = await res.json();
-      // data.responseData.translatedText often contains the translated string
-      return data.responseData?.translatedText || '(no translation)';
-    } catch (err) {
-      console.error('translate error', err);
-      return '(translation error)';
-    }
-  }
 
-  function startRecognition() {
-    const chosen = langSelect.value;
-    recognition = createRecognition(chosen);
-    if (!recognition) return;
-    try {
-      recognition.start();
-      running = true;
-      startBtn.disabled = true;
-      stopBtn.disabled = false;
-      transcriptDiv.textContent = fullText || '(listening...)';
-      translationDiv.textContent = fullTranslation || '';
-    } catch (e) {
-      console.warn('start error', e);
-    }
-  }
+    const visible = ((fullText ? fullText + ' ' : '') + final + interim).trim();
+    transcriptDiv.textContent = visible;
 
-  function stopRecognition() {
-    if (recognition) recognition.stop();
-    running = false;
+    if (final.trim()) {
+      const finalized = final.trim();
+      fullText = (fullText ? fullText + ' ' : '') + finalized;
+      const translated = await translateMyMemory(finalized, langSelect.value);
+      fullTranslation = (fullTranslation ? fullTranslation + ' ' : '') + translated;
+      translationDiv.textContent = fullTranslation;
+    }
+  };
+
+  r.onerror = (ev) => console.warn('Speech error', ev);
+  r.onend = () => {
     startBtn.disabled = false;
     stopBtn.disabled = true;
-  }
-
-  startBtn.onclick = startRecognition;
-  stopBtn.onclick = stopRecognition;
-
-  saveBtn.onclick = () => {
-    const out = 'Detected Speech:\n' + (fullText || transcriptDiv.textContent) +
-                '\n\nEnglish Translation:\n' + (fullTranslation || translationDiv.textContent);
-    const blob = new Blob([out], { type: 'text/plain' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'transcript.txt';
-    a.click();
-    URL.revokeObjectURL(a.href);
   };
 
-  langSelect.onchange = () => {
-    if (running) {
-      stopRecognition();
-      setTimeout(() => startRecognition(), 250);
-    }
-  };
+  return r;
+}
 
-  transcriptDiv.textContent = 'Press Start, select language (Spanish/French/Italian/Arabic if you will speak those).';
-  translationDiv.textContent = 'Translations appear here.';
+function startRecognition() {
+  recognition = createRecognition(langSelect.value);
+  if (!recognition) return;
+  recognition.start();
+  startBtn.disabled = true;
+  stopBtn.disabled = false;
+  transcriptDiv.textContent = '';
+  translationDiv.textContent = '';
+  fullText = '';
+  fullTranslation = '';
+}
+
+function stopRecognition() {
+  if (recognition) recognition.stop();
+  startBtn.disabled = false;
+  stopBtn.disabled = true;
+}
+
+startBtn.onclick = startRecognition;
+stopBtn.onclick = stopRecognition;
+
+saveBtn.onclick = () => {
+  const out = 'Detected Speech:\n' + fullText + '\n\nEnglish Translation:\n' + fullTranslation;
+  const blob = new Blob([out], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'transcript.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
 </script>
 
 </body>
