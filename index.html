@@ -1,83 +1,420 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Live Speech → Text + Translation (MyMemory)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vibrant Speech → Translate</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 18px; background: #f4f4f4; }
-    .controls { display:flex; gap:10px; align-items:center; margin-bottom:12px; }
-    select, button { padding:10px 12px; font-size:15px; border-radius:6px; border:none; }
-    button { background:#007bff; color:white; cursor:pointer; }
-    button:disabled { background:#bbb; cursor:default; }
-    #transcript, #translation {
-      margin-top: 14px; padding: 14px; background: white; border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.08); font-size: 18px; white-space: pre-wrap; min-height:48px;
+    :root {
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --glass-bg: rgba(255, 255, 255, 0.9);
+      --glass-border: rgba(255, 255, 255, 0.3);
+      --text-main: #1f2937;
+      --text-muted: #6b7280;
+      --card-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+      --success: #10b981;
+      --danger: #ef4444;
+      --transition: all 0.3s ease;
     }
-    label { font-size:14px; color:#333; }
-    footer { margin-top:18px; color:#666; font-size:13px; }
+
+    [data-theme="dark"] {
+      --primary: #818cf8;
+      --primary-hover: #6366f1;
+      --bg-gradient: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+      --glass-bg: rgba(17, 24, 39, 0.8);
+      --glass-border: rgba(255, 255, 255, 0.1);
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --card-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: var(--bg-gradient);
+      background-attachment: fixed;
+      color: var(--text-main);
+      transition: var(--transition);
+      padding: 20px;
+    }
+
+    .app-container {
+      width: 100%;
+      max-width: 900px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--glass-border);
+      border-radius: 24px;
+      padding: 40px;
+      box-shadow: var(--card-shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 800;
+      background: linear-gradient(to right, #818cf8, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .theme-toggle {
+      background: none;
+      border: 1px solid var(--glass-border);
+      color: var(--text-main);
+      padding: 8px 12px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: var(--transition);
+    }
+
+    .theme-toggle:hover {
+      background: var(--glass-border);
+    }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      align-items: end;
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    label {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    select, button {
+      padding: 12px 16px;
+      font-size: 15px;
+      border-radius: 12px;
+      border: 1px solid var(--glass-border);
+      outline: none;
+      transition: var(--transition);
+    }
+
+    select {
+      background: var(--glass-bg);
+      color: var(--text-main);
+      cursor: pointer;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background: var(--primary);
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    button:hover:not(:disabled) {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+    }
+
+    button:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      background: var(--text-muted);
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    button.secondary {
+      background: transparent;
+      border: 1px solid var(--primary);
+      color: var(--primary);
+    }
+
+    button.secondary:hover:not(:disabled) {
+      background: var(--primary);
+      color: white;
+    }
+
+    button.danger {
+      border-color: var(--danger);
+      color: var(--danger);
+      background: transparent;
+    }
+
+    button.danger:hover:not(:disabled) {
+      background: var(--danger);
+      color: white;
+    }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--text-muted);
+    }
+
+    .status-dot.active {
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.5; }
+      100% { opacity: 1; }
+    }
+
+    .results-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 768px) {
+      .results-container { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+
+    .copy-btn {
+      padding: 6px 10px;
+      font-size: 12px;
+      border-radius: 8px;
+    }
+
+    .content-area {
+      min-height: 180px;
+      max-height: 300px;
+      overflow-y: auto;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      font-size: 18px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
+    footer {
+      margin-top: 12px;
+      font-size: 13px;
+      color: var(--text-muted);
+      text-align: center;
+      border-top: 1px solid var(--glass-border);
+      padding-top: 20px;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb {
+      background: var(--glass-border);
+      border-radius: 10px;
+    }
   </style>
 </head>
 <body>
 
-<h1>Live Speech → Text + Translation (MyMemory)</h1>
+<div class="app-container">
+  <header>
+    <h1>SpeechTrans</h1>
+    <button class="theme-toggle" id="themeToggle">🌙 Dark Mode</button>
+  </header>
 
-<div class="controls">
-  <label for="langSelect">Input language:</label>
-  <select id="langSelect" aria-label="Select input language">
-    <option value="en-US">English</option>
-    <option value="es-ES">Spanish</option>
-    <option value="fr-FR">French</option>
-    <option value="it-IT">Italian</option>
-    <option value="ar-SA">Arabic (Modern Standard)</option>
-  </select>
+  <div class="controls-grid">
+    <div class="input-group">
+      <label for="langSelect">Input Language</label>
+      <select id="langSelect">
+        <option value="en-US">English</option>
+        <option value="es-ES">Spanish</option>
+        <option value="fr-FR">French</option>
+        <option value="it-IT">Italian</option>
+        <option value="de-DE">German</option>
+        <option value="ja-JP">Japanese</option>
+        <option value="pt-PT">Portuguese</option>
+        <option value="zh-CN">Chinese</option>
+        <option value="ru-RU">Russian</option>
+        <option value="ar-SA">Arabic</option>
+      </select>
+    </div>
 
-  <button id="startBtn">Start</button>
-  <button id="stopBtn" disabled>Stop</button>
-  <button id="saveBtn">Save Transcript</button>
+    <div class="btn-row">
+      <button id="startBtn"><span>▶</span> Start</button>
+      <button id="stopBtn" class="secondary" disabled><span>⏹</span> Stop</button>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <div id="statusDot" class="status-dot"></div>
+    <span id="statusText">Ready to listen</span>
+  </div>
+
+  <div class="results-container">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Detected Speech</span>
+        <button class="copy-btn secondary" onclick="copyToClipboard('transcript', event)">Copy</button>
+      </div>
+      <div id="transcript" class="content-area">Press Start and speak.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">English Translation</span>
+        <button class="copy-btn secondary" onclick="copyToClipboard('translation', event)">Copy</button>
+      </div>
+      <div id="translation" class="content-area">Translations appear here.</div>
+    </div>
+  </div>
+
+  <div class="btn-row" style="justify-content: center;">
+    <button id="saveBtn" class="secondary">Download Transcript</button>
+    <button id="clearBtn" class="danger">Clear All</button>
+  </div>
+
+  <footer>
+    <p>Powered by Web Speech API & MyMemory Translation</p>
+    <p>Best viewed in Chrome or Edge</p>
+  </footer>
 </div>
 
-<h2>Detected Speech</h2>
-<div id="transcript">Press Start and speak.</div>
-
-<h2>English Translation</h2>
-<div id="translation">Translations appear here.</div>
-
-<footer>Works best in Chrome. Translation uses MyMemory (free, no key, reliable for short phrases). Arabic translation may be less accurate.</footer>
-
 <script>
-const startBtn = document.getElementById('startBtn');
-const stopBtn = document.getElementById('stopBtn');
-const saveBtn = document.getElementById('saveBtn');
-const langSelect = document.getElementById('langSelect');
-const transcriptDiv = document.getElementById('transcript');
-const translationDiv = document.getElementById('translation');
+/**
+ * SpeechTrans Application Logic
+ */
 
+// --- Global State ---
 let recognition = null;
 let fullText = '';
 let fullTranslation = '';
 
-// MyMemory translation function
-async function translateMyMemory(text, lang) {
+// --- DOM Elements ---
+const elements = {
+  startBtn: document.getElementById('startBtn'),
+  stopBtn: document.getElementById('stopBtn'),
+  saveBtn: document.getElementById('saveBtn'),
+  clearBtn: document.getElementById('clearBtn'),
+  themeToggle: document.getElementById('themeToggle'),
+  langSelect: document.getElementById('langSelect'),
+  transcriptDiv: document.getElementById('transcript'),
+  translationDiv: document.getElementById('translation'),
+  statusDot: document.getElementById('statusDot'),
+  statusText: document.getElementById('statusText')
+};
+
+// --- Initialization ---
+function init() {
+  elements.themeToggle.addEventListener('click', toggleTheme);
+  elements.startBtn.addEventListener('click', startSpeechRecognition);
+  elements.stopBtn.addEventListener('click', stopSpeechRecognition);
+  elements.clearBtn.addEventListener('click', clearSession);
+  elements.saveBtn.addEventListener('click', downloadTranscript);
+}
+
+// --- Theme Management ---
+function toggleTheme() {
+  const isDark = document.body.getAttribute('data-theme') === 'dark';
+  document.body.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  elements.themeToggle.textContent = isDark ? '🌙 Dark Mode' : '☀️ Light Mode';
+}
+
+// --- UI Updates ---
+function updateStatus(text, isActive) {
+  elements.statusText.textContent = text;
+  elements.statusDot.className = 'status-dot' + (isActive ? ' active' : '');
+}
+
+function updateUIForRecording(isRecording) {
+  elements.startBtn.disabled = isRecording;
+  elements.stopBtn.disabled = !isRecording;
+}
+
+// --- Translation API ---
+async function translateText(text, fromLang) {
   if (!text) return '';
-  // Skip translation if English
-  if (lang.startsWith('en')) return text;
+  if (fromLang.startsWith('en')) return text;
+
+  updateStatus('Translating...', true);
   try {
-    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${lang.split('-')[0]}|en`;
-    const res = await fetch(url);
-    if (!res.ok) return '(translation error)';
-    const data = await res.json();
+    const sourceLangCode = fromLang.split('-')[0];
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLangCode}|en`;
+
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+    const data = await response.json();
+    updateStatus('Listening...', true);
     return data.responseData?.translatedText || '(no translation)';
-  } catch (err) {
-    console.error('Translation error', err);
-    return '(translation error)';
+  } catch (error) {
+    console.error('Translation error:', error);
+    updateStatus('Translation error', false);
+    return `(Error: ${error.message})`;
   }
 }
 
-// Setup SpeechRecognition
-function createRecognition(lang) {
+// --- Speech Recognition ---
+function createSpeechRecognition(lang) {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
-    alert('SpeechRecognition not supported in this browser. Use Chrome/Edge.');
+    alert('SpeechRecognition is not supported in this browser. Please use Chrome or Edge.');
     return null;
   }
 
@@ -86,66 +423,120 @@ function createRecognition(lang) {
   r.interimResults = true;
   r.lang = lang;
 
+  r.onstart = () => updateStatus('Listening...', true);
+
   r.onresult = async (event) => {
     let interim = '';
     let final = '';
+
     for (let i = event.resultIndex; i < event.results.length; i++) {
-      const part = event.results[i][0].transcript;
-      if (event.results[i].isFinal) final += part + ' ';
-      else interim += part;
+      const result = event.results[i][0].transcript;
+      if (event.results[i].isFinal) {
+        final += result + ' ';
+      } else {
+        interim += result;
+      }
     }
 
-    const visible = ((fullText ? fullText + ' ' : '') + final + interim).trim();
-    transcriptDiv.textContent = visible;
+    // Display real-time progress
+    const visibleTranscript = ((fullText ? fullText + ' ' : '') + final + interim).trim();
+    elements.transcriptDiv.textContent = visibleTranscript;
 
     if (final.trim()) {
-      const finalized = final.trim();
-      fullText = (fullText ? fullText + ' ' : '') + finalized;
-      const translated = await translateMyMemory(finalized, langSelect.value);
-      fullTranslation = (fullTranslation ? fullTranslation + ' ' : '') + translated;
-      translationDiv.textContent = fullTranslation;
+      const finalizedChunk = final.trim();
+      fullText = (fullText ? fullText + ' ' : '') + finalizedChunk;
+
+      const translatedChunk = await translateText(finalizedChunk, elements.langSelect.value);
+      fullTranslation = (fullTranslation ? fullTranslation + ' ' : '') + translatedChunk;
+      elements.translationDiv.textContent = fullTranslation;
     }
   };
 
-  r.onerror = (ev) => console.warn('Speech error', ev);
+  r.onerror = (event) => {
+    console.warn('Speech recognition error:', event.error);
+    updateStatus(`Error: ${event.error}`, false);
+    updateUIForRecording(false);
+  };
+
   r.onend = () => {
-    startBtn.disabled = false;
-    stopBtn.disabled = true;
+    updateUIForRecording(false);
+    if (elements.statusText.textContent === 'Listening...') {
+        updateStatus('Ready to listen', false);
+    }
   };
 
   return r;
 }
 
-function startRecognition() {
-  recognition = createRecognition(langSelect.value);
+function startSpeechRecognition() {
+  recognition = createSpeechRecognition(elements.langSelect.value);
   if (!recognition) return;
-  recognition.start();
-  startBtn.disabled = true;
-  stopBtn.disabled = false;
-  transcriptDiv.textContent = '';
-  translationDiv.textContent = '';
+
   fullText = '';
   fullTranslation = '';
+  elements.transcriptDiv.textContent = '';
+  elements.translationDiv.textContent = '';
+
+  recognition.start();
+  updateUIForRecording(true);
 }
 
-function stopRecognition() {
+function stopSpeechRecognition() {
+  if (recognition) {
+    recognition.stop();
+  }
+  updateStatus('Stopped', false);
+  updateUIForRecording(false);
+}
+
+// --- Utilities ---
+function clearSession() {
   if (recognition) recognition.stop();
-  startBtn.disabled = false;
-  stopBtn.disabled = true;
+  fullText = '';
+  fullTranslation = '';
+  elements.transcriptDiv.textContent = 'Press Start and speak.';
+  elements.translationDiv.textContent = 'Translations appear here.';
+  updateStatus('Cleared', false);
+  updateUIForRecording(false);
 }
 
-startBtn.onclick = startRecognition;
-stopBtn.onclick = stopRecognition;
-
-saveBtn.onclick = () => {
-  const out = 'Detected Speech:\n' + fullText + '\n\nEnglish Translation:\n' + fullTranslation;
-  const blob = new Blob([out], { type: 'text/plain' });
+function downloadTranscript() {
+  const content = `--- SpeechTrans Session ---\n\nDetected Speech:\n${fullText}\n\nEnglish Translation:\n${fullTranslation}`;
+  const blob = new Blob([content], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'transcript.txt';
+  a.href = url;
+  a.download = `transcript_${new Date().toISOString().slice(0,10)}.txt`;
   a.click();
-  URL.revokeObjectURL(a.href);
-};
+  URL.revokeObjectURL(url);
+}
+
+async function copyToClipboard(elementId, event) {
+  const element = document.getElementById(elementId);
+  const text = element.textContent;
+
+  // Ignore placeholders
+  if (!text || text.startsWith('Press Start') || text.startsWith('Translations appear')) return;
+
+  try {
+    await navigator.clipboard.writeText(text);
+    const button = event.currentTarget;
+    const originalLabel = button.textContent;
+    button.textContent = 'Copied!';
+    setTimeout(() => {
+      button.textContent = originalLabel;
+    }, 2000);
+  } catch (err) {
+    console.error('Failed to copy text: ', err);
+  }
+}
+
+// Expose copyToClipboard to global scope for HTML onclick
+window.copyToClipboard = copyToClipboard;
+
+// Initialize the app
+init();
+
 </script>
 
 </body>
